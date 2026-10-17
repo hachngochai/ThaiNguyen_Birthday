@@ -520,6 +520,33 @@
       ball(0.18, 0xffffff, side * 0.24, 0.05, 0.1, avatar);
     }
 
+    // Selfie prop held in the right hand.
+    const selfieRig=new THREE.Group();
+    selfieRig.position.set(.9,1.9,.54);
+    avatar.add(selfieRig);
+    const selfieBody=box(.62,.41,.30,0x393b49,0,0,0,selfieRig);
+    selfieBody.userData.specialAction='selfie';
+    const selfieLens=mesh(new THREE.CylinderGeometry(.16,.16,.12,20),mat(0x8abcc4),0,0,.21,selfieRig);
+    selfieLens.rotation.x=Math.PI/2;selfieLens.userData.specialAction='selfie';
+    const selfieFlash=box(.15,.12,.035,0xffffff,.2,.12,.18,selfieRig);
+    selfieFlash.userData.specialAction='selfie';
+    const selfieLight=new THREE.PointLight(0xfff2d6,0,8);
+    selfieLight.position.set(.2,.12,.35);selfieRig.add(selfieLight);
+    const photoArm=avatar.children.find(m=>m.isMesh&&Math.abs(m.position.x-.68)<.03&&Math.abs(m.position.y-1.3)<.05);
+    if(photoArm)photoArm.rotation.z=-.9;
+    let selfieEnd=0;
+    function specialInteraction(target){
+      if(target!=='selfie')return false;
+      selfieEnd=clocks.t+.65;
+      setSpeech('Tách! Chụp một kiểu ảnh đẹp nào, Nguyên!',avatar);
+      return true;
+    }
+    function animateSpecial(){
+      const remaining=Math.max(0,selfieEnd-clocks.t);
+      selfieLight.intensity=remaining*48;
+      selfieFlash.material.emissive.setHex(remaining>0?0xffffff:0x000000);
+      selfieFlash.material.emissiveIntensity=remaining*2;
+    }
     const balloons = [];
     for (let i = 0; i < 18; i++) {
       const b = new THREE.Group();
@@ -794,12 +821,15 @@
       if (!hits.length) return null;
       if(hits[0].object===objectTag&&objectTag.visible)return objectTag.userData.targetName;
       let obj = hits[0].object;
+      let probe=obj;
+      while(probe){if(probe.userData?.specialAction)return probe.userData.specialAction;probe=probe.parent;}
       while (obj.parent && !['gift', 'cake', 'avatar', 'letter'].includes(obj.name)) obj = obj.parent;
       return obj.name || null;
     }
 
     function handleInteraction(targetName = null) {
       ensureAudioContext();
+      if(state.phase !== 'intro' && specialInteraction(targetName))return;
       if (state.phase === 'intro') { openGift(); return; }
       if (state.phase === 'island') { enterPhase('greeting'); return; }
       if (state.phase === 'greeting') { enterPhase('explore'); return; }
@@ -892,6 +922,7 @@
       controls.update();
       island.rotation.y = state.phase === 'explore' ? Math.sin(clocks.t * 0.4) * 0.06 : island.rotation.y * 0.92;
       avatar.position.y = Math.sin(clocks.t * 2.1) * 0.06;
+      animateSpecial();
       balloons.forEach(({ group, baseY, seed }) => { group.position.y = baseY + Math.sin(clocks.t + seed) * 0.15; });
       cakeHover.rotation.z += 0.02;
       cakeHover.material.opacity = 0.4 + Math.sin(clocks.t * 3) * 0.15;
